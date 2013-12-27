@@ -79,9 +79,13 @@ public class MultipartFileBeanView extends AbstractView{
 
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\";");
 		response.setHeader("Content-Transfer-Encoding", "binary");
-		response.setHeader("Content-Length", ""+contentSize);
-		response.setContentType(contentType);
-		response.setContentLength((int)contentSize);
+		if(contentSize > 0){
+			response.setHeader("Content-Length", ""+contentSize);
+			response.setContentLength((int)contentSize);
+		}
+		if(contentType != null){
+			response.setContentType(contentType);
+		}
 		
 		this.copy(file, response.getOutputStream());
 	}
@@ -102,30 +106,14 @@ public class MultipartFileBeanView extends AbstractView{
 		logger.debug("contentSize : "+contentSize);
 		logger.debug("file : "+file);
 
-		response.setContentType(contentType);
+		if(contentType != null){
+			response.setContentType(contentType);
+		}
 		response.setContentLength((int)contentSize);
 		copy(file, response.getOutputStream());
 	}
 	
 	private void copy(File file, OutputStream out) throws Exception{
-
 		FileCopyUtils.copy(new FileInputStream(file), out);
-		/*
-		FileInputStream fis = null;
-		try {
-			fis = new FileInputStream(file);
-			FileCopyUtils.copy(fis, out);
-		} catch(Exception e){
-			e.printStackTrace();
-		}finally{
-			if(fis != null){
-				try{
-					fis.close();
-				}catch(Exception e){
-				}
-			}
-		}
-		out.flush();
-		*/
 	}
 }
