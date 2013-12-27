@@ -51,8 +51,8 @@ public class Configurer extends Properties implements InitializingBean{
 		if(! super.containsKey(BASE_LOCALE)) {super.put(BASE_LOCALE, "ko");}
 
 		if(! super.containsKey(MULTIPART_SIZE)) {super.put(MULTIPART_SIZE, 11111000l);}
-		if(! super.containsKey(MULTIPART_LOCATION)) {super.put(MULTIPART_LOCATION, new File(System.getProperty("user.dir"), "target/upload").getAbsolutePath());}
-	
+		if(! super.containsKey(MULTIPART_LOCATION)) {super.put(MULTIPART_LOCATION, new File(System.getProperty("java.io.tmpdir"), "/springfield").getAbsolutePath());}
+
 		if(! super.containsKey(SECURITY_FORM_URL)) {super.put(SECURITY_FORM_URL, "/security/user/loginForm.html");}
 		if(! super.containsKey(SECURITY_FORM_USERNAME)) {super.put(SECURITY_FORM_USERNAME, "j_username");}
 		if(! super.containsKey(SECURITY_FORM_PASSWORD)) {super.put(SECURITY_FORM_PASSWORD, "j_password");}
