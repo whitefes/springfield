@@ -4,3 +4,13 @@
 *.jar
 *.war
 *.ear
+
+
+.settings/
+.classpath
+.project
+.springBeans
+.DS_Store
+
+target/
+recycle/
