@@ -19,8 +19,6 @@ import org.hibernate.annotations.Type;
 import org.joda.time.DateTime;
 import org.springframework.format.annotation.DateTimeFormat;
 
-import com.u2ware.springfield.domain.SortOrder;
-
 @Entity
 public class Manager {
 
@@ -31,7 +29,7 @@ public class Manager {
 	private @Getter @Setter String name;
 	
 	@OneToMany(fetch=FetchType.EAGER,cascade=CascadeType.ALL ,orphanRemoval=true,mappedBy="projectId.managerId")
-	private @Getter @Setter @SuppressWarnings("unchecked") List<Project> projects = LazyList.decorate(new ArrayList<SortOrder>(100), FactoryUtils.instantiateFactory(Project.class));
+	private @Getter @Setter @SuppressWarnings("unchecked") List<Project> projects = LazyList.decorate(new ArrayList<Project>(100), FactoryUtils.instantiateFactory(Project.class));
 	
 	@Type(type="org.joda.time.contrib.hibernate.PersistentDateTime")
 	@Getter @Setter private @NotNull @DateTimeFormat(pattern="yyyy-MM-dd")  DateTime start;	

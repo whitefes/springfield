@@ -23,19 +23,25 @@ import com.u2ware.springfield.validation.RejectableException;
 
 public abstract class EntityController<T,Q> {
 	
-	protected static final Logger logger = LoggerFactory.getLogger(EntityController.class);
+	protected final Logger logger = LoggerFactory.getLogger(getClass());
 
 	public final static String COMMAND_ID_PATH   = "command_id_path";
 	public final static String COMMAND_METHOD    = "command_method";
 	public final static String COMMAND_EXTENSION = "command_extension";
 	public final static String COMMAND_VIEW      = "command_view";
 
-	public final static String MODEL_INFORMATION      = "model_information";
+	public final static String MODEL_INFORMATION     = "model_information";
 
 	public final static String MODEL_ENTITY           = "model_entity";
 	public final static String MODEL_QUERY            = "model_query";
 	public final static String MODEL_QUERY_PAGEABLE   = "model_query_pageable";
 	public final static String MODEL_QUERY_RESULT     = "model_query_result";
+	
+	public static final String PAGE_PARAMETER_NAME   = "model_query_pageable.pageNumber";
+	public static final String SIZE_PARAMETER_NAME   = "model_query_pageable.pageSize";
+	public static final String SORT_PARAMETER_NAME   = "model_query_pageable.sort";
+	public static final String ENABLE_PARAMETER_NAME = "model_query_pageable.enable";
+
 	
 	private EntityInformation<T,Q> information; 
 	private EntityService<T,Q> service;
@@ -70,7 +76,6 @@ public abstract class EntityController<T,Q> {
 	public T createEntityObject(){
 		try {
 			T command = getInformation().getEntityClass().newInstance();
-			logger.info("@ModelAttribute("+MODEL_ENTITY+"): "+getInformation().getEntityClass());	
 			return command;
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -81,7 +86,6 @@ public abstract class EntityController<T,Q> {
 	public Q createQueryObject(){
 		try {
 			Q command = getInformation().getQueryClass().newInstance();
-			logger.info("@ModelAttribute("+MODEL_QUERY+"): "+getInformation().getQueryClass());	
 			return command;
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -112,7 +116,7 @@ public abstract class EntityController<T,Q> {
 		
 		if(errors.hasErrors()){
 			for(ObjectError objectError : errors.getAllErrors()){
-				logger.info(objectError.toString());
+				logger.warn("validator error: \n"+objectError.toString());
 			}
 		}
 		if(entity == null && query == null) 
@@ -124,6 +128,20 @@ public abstract class EntityController<T,Q> {
 		model.addAttribute(MODEL_QUERY_PAGEABLE, pageable);
 		model.addAttribute(MODEL_QUERY_RESULT, queryResult);
 
+		/*
+		if(queryResult != null && ClassUtils.isAssignableValue(PageImpl.class, queryResult)){
+			PageImpl<?> p = (PageImpl<?>)queryResult;
+			logger.warn("getNumber : "+p.getNumber());
+			logger.warn("getSize : "+p.getSize());
+			logger.warn("getTotalElements : "+p.getTotalElements());
+			logger.warn("getTotalPages "+p.getTotalPages());
+			
+			logger.warn("getCurrentIndex "+p.getCurrentIndex());
+			logger.warn("getBeginIndex "+p.getBeginIndex());
+			logger.warn("getEndIndex "+p.getEndIndex());
+		}
+*/		
+		
 		ServletRequestAttributes attrs = (ServletRequestAttributes)RequestContextHolder.getRequestAttributes();
 		HttpServletRequest request = attrs.getRequest();
 
@@ -148,17 +166,16 @@ public abstract class EntityController<T,Q> {
 		}
 
 	
-		//logger.info("command_seq: "+metamodel.getSeq());
-		logger.info("command_id: "+identityPath);
-		logger.info("command_method: "+commandMethod);
-		logger.info("command_extension: "+extension);
-		logger.info("command_view: "+viewName);
+		logger.warn("response model: "+COMMAND_ID_PATH+"="+identityPath);
+		logger.warn("response model: "+COMMAND_METHOD+"="+commandMethod);
+		logger.warn("response model: "+COMMAND_EXTENSION+"="+(extension ==  null ? "" : "."+extension));
+		logger.warn("response model: "+COMMAND_VIEW+"="+viewName);
+		
 		
 		model.addAttribute(COMMAND_ID_PATH , identityPath);
 		model.addAttribute(COMMAND_METHOD , commandMethod);
 		model.addAttribute(COMMAND_EXTENSION , extension ==  null ? "" : "."+extension);
 		model.addAttribute(COMMAND_VIEW , viewName);
-		//model.addAttribute(COMMAND_SEQ , metamodel.getSeq());
 
 
 		return viewName;

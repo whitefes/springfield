@@ -1,7 +1,6 @@
 package com.u2ware.springfield.sample.security.user.login;
 
 import java.util.Date;
-import java.util.List;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -50,7 +49,7 @@ public class LoginUserRememberMeRepository implements PersistentTokenRepository{
 		logger.debug("exists : "+exists);
 		
 		if(exists){
-			PersistentLogins entity = persistentLoginsRepository.read(seriesId);
+			PersistentLogins entity = persistentLoginsRepository.findOne(seriesId);
 			logger.debug("read entity : "+entity);
 
 			String username = entity.getUsername();
@@ -77,7 +76,7 @@ public class LoginUserRememberMeRepository implements PersistentTokenRepository{
 		entity.setToken(token.getTokenValue());
 		entity.setLastUsed(new DateTime(token.getDate()));
 		
-		PersistentLogins newEntity = persistentLoginsRepository.create(entity);
+		PersistentLogins newEntity = persistentLoginsRepository.save(entity);
 		
 		logger.debug("created entity "+newEntity);
 	}
@@ -93,11 +92,11 @@ public class LoginUserRememberMeRepository implements PersistentTokenRepository{
 		
 		if(exists){
 			
-			PersistentLogins entity = persistentLoginsRepository.read(series);
+			PersistentLogins entity = persistentLoginsRepository.findOne(series);
 			entity.setToken(tokenValue);
 			entity.setLastUsed(new DateTime());
 			
-			PersistentLogins newEntity = persistentLoginsRepository.update(entity);
+			PersistentLogins newEntity = persistentLoginsRepository.save(entity);
 			logger.debug("updated entity "+newEntity);
 		}
 	}
@@ -108,7 +107,7 @@ public class LoginUserRememberMeRepository implements PersistentTokenRepository{
 	public void removeUserTokens(String username) {
 		logger.debug("removeUserTokens : "+username);
 
-		List<PersistentLogins> entities = persistentLoginsRepository.findAll(new FindByUsername(username));
+		Iterable<PersistentLogins> entities = persistentLoginsRepository.findAll(new FindByUsername(username));
 		for(PersistentLogins entity : entities){
 			persistentLoginsRepository.delete(entity);
 			logger.debug("removed entity "+entity);

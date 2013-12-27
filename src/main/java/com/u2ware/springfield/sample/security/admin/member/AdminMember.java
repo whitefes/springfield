@@ -6,6 +6,7 @@ import com.u2ware.springfield.sample.security.Users;
 
 @Springfield(
 	strategy=Strategy.JPA,
+	methodLevelMapping={"*.html"},
 	entity=Users.class
 )
 public class AdminMember {

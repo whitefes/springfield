@@ -15,7 +15,7 @@ import com.u2ware.springfield.repository.QueryMethod;
 
 @Springfield(
 	strategy=Strategy.DTO,
-	methodLevelMapping={"findForm","updateForm","update"},
+	methodLevelMapping={"findForm.html","updateForm.html","update.html"},
 	identity="username"
 )
 @QueryMethod("findBy")

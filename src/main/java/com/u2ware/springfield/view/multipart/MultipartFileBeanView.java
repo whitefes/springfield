@@ -10,21 +10,27 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.web.servlet.view.AbstractView;
 
 import com.u2ware.springfield.support.multipart.MultipartFileHandler;
-import com.u2ware.springfield.view.ViewResolverSupport;
+import com.u2ware.springfield.view.ModelFilter;
 
 public class MultipartFileBeanView extends AbstractView{
 
-	private static final Logger logger = LoggerFactory.getLogger(MultipartFileBeanView.class);
+	protected final Logger logger = LoggerFactory.getLogger(getClass());
 
+	@Autowired(required=false)
 	private MultipartFileHandler multipartFileHandler;
+	private ModelFilter modelFilter;
 	private boolean isDownload = false;
 	
 	public void setMultipartFileHandler(MultipartFileHandler multipartFileHandler) {
 		this.multipartFileHandler = multipartFileHandler;
+	}
+	public void setModelFilter(ModelFilter modelFilter) {
+		this.modelFilter = modelFilter;
 	}
 	public void setDownload(boolean isDownload) {
 		this.isDownload = isDownload;
@@ -47,7 +53,7 @@ public class MultipartFileBeanView extends AbstractView{
 	
 	private MultipartFileBean filterModel(Map<String, Object> model)throws Exception {
 		try{
-			return (MultipartFileBean)ViewResolverSupport.getResponseModel(model);
+			return (MultipartFileBean)modelFilter.extractOutputModel(model);
 		}catch(Exception e){
 			throw new Exception("Downloading is not found in model");
 		}

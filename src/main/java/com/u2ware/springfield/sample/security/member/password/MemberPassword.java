@@ -10,7 +10,7 @@ import com.u2ware.springfield.config.Springfield.Strategy;
 
 @Springfield(
 	strategy=Strategy.DTO,
-	methodLevelMapping={"createForm","create"},
+	methodLevelMapping={"createForm.html","create.html"},
 	attributesCSV="webmvc.view.method.create={read}",
 	identity="username"
 )

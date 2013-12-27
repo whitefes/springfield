@@ -3,6 +3,7 @@ package com.u2ware.springfield.sample.security.member.leave;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.Errors;
 
 import com.u2ware.springfield.repository.EntityRepository;
@@ -17,6 +18,7 @@ public class MemberLeaveValidator extends EntityValidatorImpl<MemberLeave, Membe
 	private EntityRepository<Users, String> usersRepository;
 
 	@Override
+	@Transactional
 	public void create(MemberLeave target, Errors errors) {
 		super.create(target, errors);
 		if(errors.hasErrors()) return;

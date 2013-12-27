@@ -1,12 +1,18 @@
 package com.u2ware.springfield.config;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
+import org.hibernate.ejb.HibernatePersistence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.parsing.ReaderContext;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.xml.BeanDefinitionParser;
@@ -19,10 +25,11 @@ import org.springframework.util.StringUtils;
 import org.w3c.dom.Element;
 
 import com.u2ware.springfield.config.Springfield.Strategy;
+import com.u2ware.springfield.config.support.Configurer;
 
 public class ModulesConfigDefinitionParser implements BeanDefinitionParser{
 
-	private static final Logger logger = LoggerFactory.getLogger(ModulesConfigDefinitionParser.class);
+	protected final Logger logger = LoggerFactory.getLogger(getClass());
 
 
 	private void handleError(Exception e, Element source, ParserContext parser) {
@@ -37,21 +44,24 @@ public class ModulesConfigDefinitionParser implements BeanDefinitionParser{
 		return scanner.findCandidateComponents(modulesConfig.getBasePackage());
 	}
 
-
+	private Set<String> beanNames = new HashSet<String>();
 	
 	public BeanDefinition parse(Element element, ParserContext parser) {
 	
 		try {
 			BeanDefinitionRegistry registry = parser.getRegistry();
+			
+			//BeanFactoryUtils.beanNamesForTypeIncludingAncestors((ListableBeanFactory)registry, DataSource.class);
+			
 			ModulesConfig modulesConfig = new ModulesConfig(element, parser);
 			
 			logger.warn("@Springfield");
 			logger.warn("\thttp://u2waremanager.github.io/springfield");
 			logger.warn("\t"+modulesConfig.getBasePackage()+" scaning...");
 
-			
+			addJdbcTemplateConfiguration(registry, modulesConfig);
+
 			Set<BeanDefinition> springfieldDefs  = findCandidateComponents(modulesConfig, parser, Springfield.class);
-			
 			for (BeanDefinition springfieldDef : springfieldDefs) {
 
 				String targetClassName = springfieldDef.getBeanClassName();
@@ -80,9 +90,21 @@ public class ModulesConfigDefinitionParser implements BeanDefinitionParser{
 				}
 			}
 			
-			////////////////
-			//
-			////////////////
+			addSpringfieldConfigurerConfiguration(registry, modulesConfig);
+			addMultipartResolverConfiguration(registry, modulesConfig);
+			addMultipartHandlerConfiguration(registry, modulesConfig);
+
+			addSpringfieldContextWebmvcBaseConfiguration(registry, modulesConfig);
+			addSpringfieldContextWebmvcSecurityConfiguration(registry, modulesConfig);
+			
+			
+			List<String> r = new ArrayList<String>(beanNames);
+			Collections.sort(r);
+			logger.warn("\t");
+			for(String beanName : r){
+				logger.warn("\t"+beanName+" = "+registry.getBeanDefinition(beanName).getBeanClassName());
+			}
+			logger.warn("\t");
 			
 			
 		} catch (Exception e) {
@@ -92,18 +114,19 @@ public class ModulesConfigDefinitionParser implements BeanDefinitionParser{
 		return null;
 	}
 	
-	
 	///////////////////////////////////////
 	//
 	///////////////////////////////////////
 	private void registerBeanDefinition(BeanDefinitionRegistry registry, String beanName, BeanDefinition beanDefinition){
 		registry.registerBeanDefinition(beanName, beanDefinition);
-		logger.warn(beanName+" = "+beanDefinition.getBeanClassName());
+		beanNames.add(beanName);
 	}
 	
 	private void registerBeanDefinition(BeanDefinitionRegistry registry, String beanName){
-		logger.warn(beanName+" = <<bean name used in registry >>");
+		//logger.debug(beanName+" = <<bean name used in registry >>");
 	}
+	
+	
 	
 	
 	///////////////////////////////////////
@@ -112,8 +135,12 @@ public class ModulesConfigDefinitionParser implements BeanDefinitionParser{
 	private void addConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
 
 		Strategy strategy = webapp.strategy();
-		if(Strategy.DEFAULT_STRATEGY.equals(strategy)){
-			strategy = Strategy.valueOf(modulesConfig.getDefaultStrategy());
+		if(Strategy.NULL.equals(strategy)){
+			if(StringUtils.hasText(modulesConfig.getDefaultStrategy())){
+				strategy = Strategy.valueOf(modulesConfig.getDefaultStrategy());
+			}else{
+				strategy = Strategy.JPA;
+			}
 		}
 		
 		if(Strategy.HIBERNATE_REPOSITORY_ONLY.equals(strategy)){
@@ -122,49 +149,543 @@ public class ModulesConfigDefinitionParser implements BeanDefinitionParser{
 		}else if(Strategy.JPA_REPOSITORY_ONLY.equals(strategy)){
 			addJpaRepositoryConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 
-		}else if(Strategy.MONGODB_REPOSITORY_ONLY.equals(strategy)){
-			addMangodbRepositoryConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
+		}else if(Strategy.JDBC_REPOSITORY_ONLY.equals(strategy)){
+			addJdbcRepositoryConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 	
 		}else if(Strategy.SQLSESSION_REPOSITORY_ONLY.equals(strategy)){
 			addSqlSessionRepositoryConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 		
 		}else if(Strategy.HIBERNATE.equals(strategy)){
-			addEntityInformationConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addHibernateRepositoryConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
-			addEntityServiceConfiguration(registry, modulesConfig, entityClass, queryClass, webapp, false);
+			addHibernateServiceConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
+			addEntityInformationConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addEntityValidatorConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addEntityControllerConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			
 		}else if(Strategy.JPA.equals(strategy)){
-			addEntityInformationConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addJpaRepositoryConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
-			addEntityServiceConfiguration(registry, modulesConfig, entityClass, queryClass, webapp, false);
+			addJpaServiceConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
+			addEntityInformationConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addEntityValidatorConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addEntityControllerConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 
-		}else if(Strategy.MONGODB.equals(strategy)){
+		}else if(Strategy.JDBC.equals(strategy)){
+			addJdbcRepositoryConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
+			addJdbcServiceConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addEntityInformationConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
-			addMangodbRepositoryConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
-			addEntityServiceConfiguration(registry, modulesConfig, entityClass, queryClass, webapp, false);
 			addEntityValidatorConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addEntityControllerConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 
 		}else if(Strategy.SQLSESSION.equals(strategy)){
-			addEntityInformationConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addSqlSessionRepositoryConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
-			addEntityServiceConfiguration(registry, modulesConfig, entityClass, queryClass, webapp, false);
+			addSqlSessionServiceConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
+			addEntityInformationConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addEntityValidatorConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addEntityControllerConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			
 		}else if(Strategy.DTO.equals(strategy)){
+			addDummyServiceConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addEntityInformationConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
-			addEntityServiceConfiguration(registry, modulesConfig, entityClass, queryClass, webapp, true);
 			addEntityValidatorConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 			addEntityControllerConfiguration(registry, modulesConfig, entityClass, queryClass, webapp);
 		}	
 	}
 	
 
+	///////////////////////////////////////
+	//
+	///////////////////////////////////////
+	private BeanDefinition getHibernatePropertiesFor(String dataSourceBeanName, Object source) {
+
+		BeanDefinitionBuilder builder = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.repository.hibernate.support.HibernateDialectType");
+		builder.setFactoryMethod("hibernateProperties");
+		builder.addConstructorArgReference(dataSourceBeanName);
+		AbstractBeanDefinition bean = builder.getRawBeanDefinition();
+		bean.setSource(source);
+		return bean;
+	}
+	private BeanDefinition getSQLTemplatesFor(String dataSourceBeanName, Object source) {
+		
+		BeanDefinitionBuilder builder = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.repository.jdbc.support.SQLTemplatesType");
+		builder.setFactoryMethod("sqlTemplates");
+		builder.addConstructorArgReference(dataSourceBeanName);
+		AbstractBeanDefinition bean = builder.getRawBeanDefinition();
+		bean.setSource(source);
+		return bean;
+	}
+
+	private BeanDefinition getEntityManagerBeanDefinitionFor(String entityManagerFactoryBeanName, Object source) {
+
+		BeanDefinitionBuilder builder = BeanDefinitionBuilder
+				.rootBeanDefinition("org.springframework.orm.jpa.SharedEntityManagerCreator");
+		builder.setFactoryMethod("createSharedEntityManager");
+		builder.addConstructorArgReference(entityManagerFactoryBeanName);
+		AbstractBeanDefinition bean = builder.getRawBeanDefinition();
+		bean.setSource(source);
+		return bean;
+	}
+
+	///////////////////////////////////////
+	//
+	///////////////////////////////////////
+	private String getDataSourceTxRef(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {		
+	
+		String dataSourceRef = modulesConfig.getDataSourceRef();
+		String dataSourceTxRef = dataSourceRef+"TransactionManager";
+		if(registry.isBeanNameInUse(dataSourceTxRef)) {registerBeanDefinition(registry, dataSourceTxRef); return dataSourceTxRef;}
+		
+		BeanDefinition dataSourceTxDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("org.springframework.jdbc.datasource.DataSourceTransactionManager")
+				.addPropertyReference("dataSource", dataSourceRef)
+				.getBeanDefinition();
+		this.registerBeanDefinition(registry, dataSourceTxRef, dataSourceTxDefinition);
+		
+		
+		if(StringUtils.hasText(modulesConfig.getDefaultStrategy())){
+			if(Strategy.valueOf(modulesConfig.getDefaultStrategy()).equals(Strategy.SQLSESSION)
+			|| Strategy.valueOf(modulesConfig.getDefaultStrategy()).equals(Strategy.SQLSESSION_REPOSITORY_ONLY)
+			|| Strategy.valueOf(modulesConfig.getDefaultStrategy()).equals(Strategy.JDBC)
+			|| Strategy.valueOf(modulesConfig.getDefaultStrategy()).equals(Strategy.JDBC_REPOSITORY_ONLY)
+			){
+				addSpringfieldContextRepositoryBaseConfiguration(registry, modulesConfig, dataSourceTxRef);
+			}
+		}
+		
+		return dataSourceTxRef;
+	}
+	
+	private String getDataSourceTxTemplateRef(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {		
+
+		String dataSourceRef = modulesConfig.getDataSourceRef();
+		String dataSourceTxRef = getDataSourceTxRef(registry, modulesConfig);
+		String dataSourceTxTemplateRef = dataSourceRef+"TransactionTemplate";
+		if(registry.isBeanNameInUse(dataSourceTxTemplateRef)) {registerBeanDefinition(registry, dataSourceTxTemplateRef); return dataSourceTxTemplateRef;}
+
+		BeanDefinition dataSourceTxTemplateRefDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("org.springframework.transaction.support.TransactionTemplate")
+				.addConstructorArgReference(dataSourceTxRef)
+				.getBeanDefinition();
+		this.registerBeanDefinition(registry, dataSourceTxTemplateRef, dataSourceTxTemplateRefDefinition);
+		
+		return dataSourceTxTemplateRef;
+	}
+
+	///////////////////////////////////////
+	//
+	///////////////////////////////////////
+	private void addJdbcTemplateConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {		
+	
+		String dataSourceRef = modulesConfig.getDataSourceRef();
+		String jdbcTemplateRef = dataSourceRef+"JdbcTemplate";
+		if(registry.isBeanNameInUse(jdbcTemplateRef)) {registerBeanDefinition(registry, jdbcTemplateRef); return ;}
+		
+		BeanDefinition jdbcTemplateDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("org.springframework.jdbc.core.JdbcTemplate")
+				.addConstructorArgReference(dataSourceRef)
+				.getBeanDefinition();
+		this.registerBeanDefinition(registry, jdbcTemplateRef, jdbcTemplateDefinition);
+	}
+	
+	
+	///////////////////////////////////////
+	//
+	///////////////////////////////////////
+	private String getSqlSessionFactoryRef(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) throws Exception{
+
+		if(StringUtils.hasText(modulesConfig.getSqlSessionFactoryRef())){
+			return modulesConfig.getSqlSessionFactoryRef();
+			
+		}else{
+			String dataSourceRef = modulesConfig.getDataSourceRef();
+			String sqlSessionFactoryRef = dataSourceRef+"Mybatis";
+			
+			String[] packagesToScan = new String[]{modulesConfig.getBasePackage()};
+			//logger.trace("add mapperLocations : "+StringUtils.arrayToCommaDelimitedString(mapperLocations));
+			
+			if(registry.isBeanNameInUse(sqlSessionFactoryRef)) {
+				BeanDefinition savedBean = registry.getBeanDefinition(sqlSessionFactoryRef);
+				String[] savedValue = (String[])
+						savedBean.getPropertyValues().getPropertyValue("packagesToScan").getValue();
+				if(savedValue != null){
+					//logger.trace("saved mapperLocations : "+StringUtils.arrayToCommaDelimitedString(savedMapperLocations));
+					
+					String[] newValue = new String[savedValue.length+packagesToScan.length];
+					for(int i = 0; i < savedValue.length; i++){
+						newValue[i] = savedValue[i];
+					}
+					for(int i = 0; i < packagesToScan.length; i++){
+						newValue[i + packagesToScan.length] = packagesToScan[i];
+					}
+					packagesToScan = newValue;
+				}
+				registry.removeBeanDefinition(sqlSessionFactoryRef);
+			}
+			//logger.trace("new mappingLocations : "+StringUtils.arrayToCommaDelimitedString(mapperLocations));
+			
+			BeanDefinition beanDefinition = BeanDefinitionBuilder
+					.rootBeanDefinition("com.u2ware.springfield.repository.sqlsession.SqlSessionFactoryBean")
+					.addPropertyReference("dataSource", dataSourceRef)
+					.addPropertyValue("packagesToScan", packagesToScan)
+					.addPropertyValue("mapperLocationsPatterns", new String[]{"/**/*.sqlsession.xml"})
+					.getBeanDefinition();
+
+			this.registerBeanDefinition(registry, sqlSessionFactoryRef, beanDefinition);
+			return sqlSessionFactoryRef;
+		}
+	}
+	
+	
+	///////////////////////////////////////
+	//
+	///////////////////////////////////////
+	private String getSessionFactoryRef(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
+		
+		if(StringUtils.hasText(modulesConfig.getSessionFactoryRef())){
+			return modulesConfig.getSessionFactoryRef();
+
+		}else{
+			String dataSourceRef = modulesConfig.getDataSourceRef();
+			String sessionFactoryRef = dataSourceRef+"Hibernate";
+			
+			String[] packages = new String[]{modulesConfig.getBasePackage()};
+			//logger.trace("add packages : "+StringUtils.arrayToCommaDelimitedString(packages));
+			
+			if(registry.isBeanNameInUse(sessionFactoryRef)) {
+
+				BeanDefinition savedBean = registry.getBeanDefinition(sessionFactoryRef);
+
+				String[] savedPackages = (String[])
+						savedBean.getPropertyValues().getPropertyValue("packagesToScan").getValue();
+				//logger.trace("saved packages : "+StringUtils.arrayToCommaDelimitedString(savedPackages));
+
+				if(savedPackages != null){
+					
+					String[] newPackage = new String[packages.length+savedPackages.length];
+					
+					for(int i = 0; i < savedPackages.length; i++){
+						newPackage[i] = savedPackages[i];
+					}
+					for(int i = 0; i < packages.length; i++){
+						newPackage[i + savedPackages.length] = packages[i];
+					}
+					packages = newPackage;
+				}
+				registry.removeBeanDefinition(sessionFactoryRef);
+			}
+			//logger.trace("new packages : "+StringUtils.arrayToCommaDelimitedString(packages));
+
+			BeanDefinition beanDefinition = BeanDefinitionBuilder
+					.rootBeanDefinition("org.springframework.orm.hibernate3.annotation.AnnotationSessionFactoryBean")
+					.addPropertyReference("dataSource", dataSourceRef)
+					.addPropertyValue("packagesToScan", packages)
+					.addPropertyValue("annotatedPackages", packages)
+					.addPropertyValue("hibernateProperties", getHibernatePropertiesFor(dataSourceRef, modulesConfig.getSource()))
+					.getBeanDefinition();
+			
+			this.registerBeanDefinition(registry, sessionFactoryRef, beanDefinition);
+			return sessionFactoryRef;
+		}
+	}
+	
+	private String getSessionFactoryTxRef(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
+
+		String sessionFactoryRef = getSessionFactoryRef(registry, modulesConfig);
+		String sessionFactoryTxRef = sessionFactoryRef+"TransactionManager";
+		if(registry.isBeanNameInUse(sessionFactoryTxRef)) {registerBeanDefinition(registry, sessionFactoryTxRef); return sessionFactoryTxRef;}
+		
+		BeanDefinition sessionFactoryTxDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("org.springframework.orm.hibernate3.HibernateTransactionManager")
+				.addPropertyReference("sessionFactory", sessionFactoryRef)
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, sessionFactoryTxRef, sessionFactoryTxDefinition);
+		
+		if(StringUtils.hasText(modulesConfig.getDefaultStrategy())){
+			if(Strategy.valueOf(modulesConfig.getDefaultStrategy()).equals(Strategy.HIBERNATE)
+			|| Strategy.valueOf(modulesConfig.getDefaultStrategy()).equals(Strategy.HIBERNATE_REPOSITORY_ONLY)
+			){
+				addSpringfieldContextRepositoryBaseConfiguration(registry, modulesConfig, sessionFactoryTxRef);
+			}
+		}
+		return sessionFactoryTxRef;
+	}
+	
+	private String getSessionFactoryTxTemplateRef(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
+
+		String sessionFactoryRef = getSessionFactoryRef(registry, modulesConfig);
+		String sessionFactoryTxRef = getSessionFactoryTxRef(registry, modulesConfig);
+		String sessionFactoryTxTemplateRef = sessionFactoryRef+"TransactionTemplate";
+		if(registry.isBeanNameInUse(sessionFactoryTxTemplateRef)) {registerBeanDefinition(registry, sessionFactoryTxTemplateRef); return sessionFactoryTxTemplateRef;}
+
+		BeanDefinition sessionFactoryTxTemplateDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("org.springframework.transaction.support.TransactionTemplate")
+				.addConstructorArgReference(sessionFactoryTxRef)
+				.getBeanDefinition();
+		this.registerBeanDefinition(registry, sessionFactoryTxTemplateRef, sessionFactoryTxTemplateDefinition);
+		
+		return sessionFactoryTxTemplateRef;
+	}
+	
+	
+	///////////////////////////////////////
+	//
+	///////////////////////////////////////
+	private String getEntityManagerFactoryRef(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) throws Exception{
+		
+		if(StringUtils.hasText(modulesConfig.getEntityManagerFactoryRef())){
+			return modulesConfig.getEntityManagerFactoryRef();
+		}else{
+			String dataSourceRef = modulesConfig.getDataSourceRef();
+			String entityManagerFactoryRef = dataSourceRef+"Jpa";
+
+
+			String[] packages = new String[]{modulesConfig.getBasePackage()};
+			//logger.trace("add packages : "+StringUtils.arrayToCommaDelimitedString(packages));
+			
+			if(registry.isBeanNameInUse(entityManagerFactoryRef)) {
+		
+				BeanDefinition savedBean = registry.getBeanDefinition(entityManagerFactoryRef);
+				String[] savedPackages = (String[])
+						(savedBean.getPropertyValues().getPropertyValue("packagesToScan").getValue());
+				//logger.trace("saved packages : "+StringUtils.arrayToCommaDelimitedString(savedPackages));
+
+				if(savedPackages != null){
+					
+					String[] newPackage = new String[packages.length+savedPackages.length];
+					
+					for(int i = 0; i < savedPackages.length; i++){
+						newPackage[i] = savedPackages[i];
+					}
+					for(int i = 0; i < packages.length; i++){
+						newPackage[i + savedPackages.length] = packages[i];
+					}
+					packages = newPackage;
+				}
+				registry.removeBeanDefinition(entityManagerFactoryRef);
+			}
+			//logger.trace("new packages : "+StringUtils.arrayToCommaDelimitedString(packages));
+			
+			BeanDefinition beanDefinition = BeanDefinitionBuilder
+					.rootBeanDefinition("org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean")
+					.addPropertyReference("dataSource", dataSourceRef)
+					.addPropertyValue("persistenceUnitName", entityManagerFactoryRef)
+					.addPropertyValue("persistenceProviderClass", HibernatePersistence.class)
+					.addPropertyValue("packagesToScan", packages)
+					.addPropertyValue("jpaProperties", getHibernatePropertiesFor(dataSourceRef, modulesConfig.getSource()))
+					.getBeanDefinition();
+			
+			this.registerBeanDefinition(registry, entityManagerFactoryRef, beanDefinition);
+			return entityManagerFactoryRef;
+		}
+	}
+	
+	private String getEntityManagerFactoryTxRef(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) throws Exception{
+		
+		String emfRef = getEntityManagerFactoryRef(registry, modulesConfig);
+		String emfTxRef = emfRef+"TransactionManager";
+		if(registry.isBeanNameInUse(emfTxRef)) {registerBeanDefinition(registry, emfTxRef); return emfTxRef;}
+	
+		BeanDefinition emfTxDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("org.springframework.orm.jpa.JpaTransactionManager")
+				.addPropertyReference("entityManagerFactory", emfRef)
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, emfTxRef, emfTxDefinition);
+
+		addSpringfieldContextRepositoryBaseConfiguration(registry, modulesConfig, emfTxRef);
+		
+		return emfTxRef;
+	}
+	
+	
+	private String getEntityManagerFactoryTxTemplateRef(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) throws Exception{
+	
+		String emfRef = getEntityManagerFactoryRef(registry, modulesConfig);
+		String emfTxRef = getEntityManagerFactoryTxRef(registry, modulesConfig);
+		String emfTxTemplateRef = emfRef+"TransactionTemplate";
+		if(registry.isBeanNameInUse(emfTxTemplateRef)) {registerBeanDefinition(registry, emfTxTemplateRef); return emfTxTemplateRef;}
+
+		
+		BeanDefinition emfTxTemplateDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("org.springframework.transaction.support.TransactionTemplate")
+				.addConstructorArgReference(emfTxRef)
+				.getBeanDefinition();
+		this.registerBeanDefinition(registry, emfTxTemplateRef, emfTxTemplateDefinition);
+		
+		return emfTxTemplateRef;
+	}
+	
+	
+	
+	///////////////////////////////////////////////
+	//
+	///////////////////////////////////////////////
+	private void addJdbcRepositoryConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) {
+		
+		getDataSourceTxTemplateRef(registry, modulesConfig);
+
+		String beanName = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
+		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
+		
+		String dataSourceRef = modulesConfig.getDataSourceRef();
+		String jdbcTemplateRef = dataSourceRef+"JdbcTemplate";
+		
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.repository.jdbc.JdbcRepository")
+				.addConstructorArgValue(entityClass)
+				.addConstructorArgReference(jdbcTemplateRef)
+				.addPropertyValue("dialect", getSQLTemplatesFor(dataSourceRef, modulesConfig.getSource()))
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+	
+
+	private void addSqlSessionRepositoryConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
+
+		getDataSourceTxTemplateRef(registry, modulesConfig);
+
+		String beanName = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
+		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
+	
+		String sqlSessionFactoryRef = getSqlSessionFactoryRef(registry, modulesConfig);
+		
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.repository.sqlsession.SqlSessionRepository")
+				.addConstructorArgValue(entityClass)
+				.addConstructorArgReference(sqlSessionFactoryRef)
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+
+
+	private void addHibernateRepositoryConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) {
+
+		getSessionFactoryTxTemplateRef(registry, modulesConfig);
+		
+		String beanName = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
+		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
+
+		String sessionFactoryRef = getSessionFactoryRef(registry, modulesConfig);
+		
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.repository.hibernate.HibernateRepository")
+				.addConstructorArgValue(entityClass)
+				.addConstructorArgReference(sessionFactoryRef)
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+	
+	private void addJpaRepositoryConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
+
+		getEntityManagerFactoryTxTemplateRef(registry, modulesConfig);
+
+		String beanName = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
+		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
+
+		getEntityManagerFactoryTxRef(registry, modulesConfig);
+		String entityManagerFactoryRef = getEntityManagerFactoryRef(registry, modulesConfig);
+		BeanDefinition entityManagerFactoryValue = getEntityManagerBeanDefinitionFor(entityManagerFactoryRef, modulesConfig.getSource());
+		
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.repository.jpa.JpaRepository")
+				.addConstructorArgValue(entityClass)
+				.addConstructorArgValue(entityManagerFactoryValue)
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+	
+	
+	////////////////////////////////////////////////////////////////////////
+	//
+	////////////////////////////////////////////////////////////////////////
+	private void addDummyServiceConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
+		String beanName = ClassUtils.getShortNameAsProperty(queryClass)+"Service";
+		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
+		
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.service.EntityServiceImpl")
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+	
+	private void addJdbcServiceConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
+
+		String beanName = ClassUtils.getShortNameAsProperty(queryClass)+"Service";
+		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
+
+		String repositoryRef = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
+		String txTemplateRef = getDataSourceTxTemplateRef(registry, modulesConfig);
+		
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.service.EntityServiceImpl")
+				.addConstructorArgReference(txTemplateRef)
+				.addConstructorArgReference(repositoryRef)
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+	
+	private void addSqlSessionServiceConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
+		
+		String beanName = ClassUtils.getShortNameAsProperty(queryClass)+"Service";
+		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
+
+		String repositoryRef = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
+		String txTemplateRef = getDataSourceTxTemplateRef(registry, modulesConfig);
+		
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.service.EntityServiceImpl")
+				.addConstructorArgReference(txTemplateRef)
+				.addConstructorArgReference(repositoryRef)
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+
+	private void addHibernateServiceConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
+
+		String beanName = ClassUtils.getShortNameAsProperty(queryClass)+"Service";
+		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
+
+		String repositoryRef = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
+		String txTemplateRef = getSessionFactoryTxTemplateRef(registry, modulesConfig);
+		
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.service.EntityServiceImpl")
+				.addConstructorArgReference(txTemplateRef)
+				.addConstructorArgReference(repositoryRef)
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+
+
+	private void addJpaServiceConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
+
+
+		String beanName = ClassUtils.getShortNameAsProperty(queryClass)+"Service";
+		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
+
+		String repositoryRef = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
+		String txTemplateRef = getEntityManagerFactoryTxTemplateRef(registry, modulesConfig);
+		
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.service.EntityServiceImpl")
+				.addConstructorArgReference(txTemplateRef)
+				.addConstructorArgReference(repositoryRef)
+				.getBeanDefinition();
+		
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+	
+	
 	///////////////////////////////////////
 	//
 	///////////////////////////////////////
@@ -200,95 +721,6 @@ public class ModulesConfigDefinitionParser implements BeanDefinitionParser{
 		this.registerBeanDefinition(registry, beanName, beanDefinition);
 	}
 
-	///////////////////////////////////////
-	//
-	///////////////////////////////////////
-	private void addHibernateRepositoryConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) {
-
-		String beanName = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
-		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
-
-		BeanDefinition beanDefinition = BeanDefinitionBuilder
-				.rootBeanDefinition("com.u2ware.springfield.repository.hibernate.EntityHibernateRepository")
-				.addConstructorArgValue(entityClass)
-				.addConstructorArgValue(null)
-				.getBeanDefinition();
-		
-		this.registerBeanDefinition(registry, beanName, beanDefinition);
-		
-	}
-
-	private void addJpaRepositoryConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
-
-		String beanName = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
-		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
-		
-		//logger.info(beanName);
-
-		BeanDefinition beanDefinition = BeanDefinitionBuilder
-				.rootBeanDefinition("com.u2ware.springfield.repository.jpa.EntityJpaRepository")
-				.addConstructorArgValue(entityClass)
-				.addConstructorArgValue(null)
-				.getBeanDefinition();
-		
-		this.registerBeanDefinition(registry, beanName, beanDefinition);
-	}
-	
-	private void addSqlSessionRepositoryConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
-
-		String beanName = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
-		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
-
-		//logger.info(beanName);
-
-		BeanDefinition beanDefinition = BeanDefinitionBuilder
-				.rootBeanDefinition("com.u2ware.springfield.repository.sqlsession.EntitySqlSessionRepository")
-				.addConstructorArgValue(entityClass)
-				.addConstructorArgValue(null)
-				.getBeanDefinition();
-		
-		this.registerBeanDefinition(registry, beanName, beanDefinition);
-	}
-	
-	private void addMangodbRepositoryConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
-		String beanName = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
-		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
-
-		//logger.info(beanName);
-
-		BeanDefinition beanDefinition = BeanDefinitionBuilder
-				.rootBeanDefinition("com.u2ware.springfield.repository.mongodb.EntityMongodbRepository")
-				.addConstructorArgValue(entityClass)
-				.addConstructorArgValue(null)
-				.getBeanDefinition();
-		
-		this.registerBeanDefinition(registry, beanName, beanDefinition);
-	}
-	
-	/////////////////////////////////////////////////
-	//
-	/////////////////////////////////////////////////
-	private void addEntityServiceConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp, boolean isDummy) throws Exception{
-		String beanName = ClassUtils.getShortNameAsProperty(queryClass)+"Service";
-		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
-		
-
-		BeanDefinition beanDefinition = null;
-		if(isDummy){
-			beanDefinition = BeanDefinitionBuilder
-					.rootBeanDefinition("com.u2ware.springfield.service.EntityServiceImpl")
-					.getBeanDefinition();
-		}else{
-			String repositoryName = ClassUtils.getShortNameAsProperty(entityClass)+"Repository";
-			
-			//logger.info(beanName);
-			beanDefinition = BeanDefinitionBuilder
-					.rootBeanDefinition("com.u2ware.springfield.service.EntityServiceImpl")
-					.addConstructorArgReference(repositoryName)
-					.getBeanDefinition();
-		}
-		this.registerBeanDefinition(registry, beanName, beanDefinition);
-	}
 	
 	///////////////////////////////////////
 	//
@@ -306,10 +738,12 @@ public class ModulesConfigDefinitionParser implements BeanDefinitionParser{
 	}
 
 	
+	
 	///////////////////////////////////////
 	//
 	///////////////////////////////////////
 	private void addEntityControllerConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, Class<?> entityClass, Class<?> queryClass, Springfield webapp) throws Exception{
+
 
 		String beanName = ClassUtils.getShortNameAsProperty(queryClass)+"Controller";
 		if(registry.isBeanNameInUse(beanName)) {registerBeanDefinition(registry, beanName); return ;}
@@ -329,283 +763,99 @@ public class ModulesConfigDefinitionParser implements BeanDefinitionParser{
 		this.registerBeanDefinition(registry, beanName, beanDefinition);
 	}
 	
+	///////////////////////////////////////
+	//
+	///////////////////////////////////////
+	private void addSpringfieldConfigurerConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
+		String beanName = Configurer.BEAN_NAME;
+		if(registry.isBeanNameInUse(beanName)) {registry.removeBeanDefinition(beanName);}
+
+		BeanDefinitionBuilder builder = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.config.support.Configurer")
+				.addPropertyValue("basePackage", modulesConfig.getBasePackage());
+		if(StringUtils.hasText(modulesConfig.getPropertiesRef())){
+			builder.addPropertyReference("properties", modulesConfig.getPropertiesRef());
+		}
+		BeanDefinition beanDefinition = builder.getRawBeanDefinition();
+
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+	private String getSpringfieldConfigurerValue(String key){
+		return "#{"+Configurer.BEAN_NAME+"['"+key+"']}";
+	}
+
 	
-}
-
-/*
-
-			////////////////////////////////////////////////
-			//
-			////////////////////////////////////////////////
-			Set<BeanDefinition> mongodbDefs = findCandidateComponents(modulesConfig, parser, Document.class);
-			for (BeanDefinition mongodbDef : mongodbDefs) {
-
-				String entityClassName = mongodbDef.getBeanClassName();
-				Class<?> entityClass = ClassUtils.forName(entityClassName, getClass().getClassLoader());
-				
-				addMangodbRepositoryConfiguration(registry, modulesConfig, entityClass);
-				addServiceConfiguration(registry, modulesConfig, entityClass);	
-			}
-
-			////////////////////////////////////////////////
-			//
-			////////////////////////////////////////////////
-			Set<BeanDefinition> entityDefs = findCandidateComponents(modulesConfig, parser, Entity.class);
-			for (BeanDefinition entityDef : entityDefs) {
-
-				String entityClassName = entityDef.getBeanClassName();
-				Class<?> entityClass = ClassUtils.forName(entityClassName, getClass().getClassLoader());
-				
-				addJpaRepositoryConfiguration(registry, modulesConfig, entityClass);
-				addServiceConfiguration(registry, modulesConfig, entityClass);	
-			}
-			
-			////////////////////////////////////////////////
-			//
-			////////////////////////////////////////////////
-			Set<BeanDefinition> sqlSessionDefs = findCandidateComponents(modulesConfig, parser, Persistent.class);
-			for (BeanDefinition sqlSessionDef : sqlSessionDefs) {
-
-				String entityClassName = sqlSessionDef.getBeanClassName();
-				Class<?> entityClass = ClassUtils.forName(entityClassName, getClass().getClassLoader());
-				
-				addSqlSessionRepositoryConfiguration(registry, modulesConfig, entityClass);
-				addServiceConfiguration(registry, modulesConfig, entityClass);	
-			}
-			
-			//////////////////////////////////
-			//
-			/////////////////////////////////////////
-			Set<BeanDefinition> springfieldDefs  = findCandidateComponents(modulesConfig, parser, Springfield.class);
-			
-			//int controllerCount = 0;
-			for (BeanDefinition springfieldDef : springfieldDefs) {
-				
-				String queryClassName = springfieldDef.getBeanClassName();
-				Class<?> queryClass = ClassUtils.forName(queryClassName, getClass().getClassLoader());
-				Springfield springfield = AnnotationUtils.findAnnotation(queryClass, Springfield.class);
-				
-				Class<?> entityClass = springfield.entity();
-				if(Class.class.equals(entityClass))
-					entityClass = queryClass;
-
-				//logger.debug("..............."+webappClass);
-				//logger.debug("..............."+webappEntityClass);
-				//logger.debug("..............."+StringUtils.arrayToCommaDelimitedString(webapp.extensions()));
-				
-				addHandlerMetamodelConfiguration(registry, modulesConfig, entityClass, queryClass, springfield);
-				addHandlerConfiguration(registry, modulesConfig, entityClass, queryClass);
-				//controllerCount++;
-			}
-
-
-
-private BeanDefinition getEntityManagerBeanDefinition(ModulesConfig modulesConfig) {
-	BeanDefinitionBuilder builder = BeanDefinitionBuilder
-			.rootBeanDefinition("org.springframework.orm.jpa.SharedEntityManagerCreator")
-			.setFactoryMethod("createSharedEntityManager")
-			.addConstructorArgReference(modulesConfig.getEntityManagerFactoryRef());
 	
-	AbstractBeanDefinition bean = builder.getRawBeanDefinition();
-	bean.setSource(modulesConfig.getSource());
-	return bean;
-}
-
-	BeanDefinition beanDefinition = BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.repository.jpa.EntityRepositoryImpl")
-			.addConstructorArgValue(entityClass)
-			.addConstructorArgValue(this.getEntityManagerBeanDefinition(modulesConfig))
-			.getBeanDefinition();
-			
-	BeanDefinition beanDefinition = BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.service.EntityServiceImpl")
-			.addConstructorArgReference(ClassUtils.getShortNameAsProperty(entityClass)+"Repository")
-			.addConstructorArgReference(modulesConfig.getTransactionManagerRef())
-			.getBeanDefinition();
-			
-			//.addConstructorArgValue(this.getEntityManagerBeanDefinition(modulesConfig))
-			
-*/
-/*
-
-/////////////////////////////////
-//
-/////////////////////////////////	
-private void addEventListenerConfigurerConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
-	
-	String beanName = "com.u2ware.springfield.repository.HibernateEventListenerConfigurer";
-	if(registry.isBeanNameInUse(beanName)) return;
-
-	BeanDefinition beanDefinition = BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.repository.HibernateEventListenerConfigurer")
-			.addConstructorArgValue(this.getEntityManagerBeanDefinition(modulesConfig))
-			.getBeanDefinition();
-	
-	this.registerBeanDefinition(registry, beanName, beanDefinition);
-}
-
-///////////////////////////////////////
-//
-///////////////////////////////////////
-private void addHandlerViewResolverConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
-
-	if(StringUtils.hasText(modulesConfig.getContentNegotiatingViewResolverRef())) return;
-	
-	String beanName = "contentNegotiatingViewResolverBySpringfield";
-	if(registry.isBeanNameInUse(beanName)) return;
-
-	Map<String,String> mediaTypes = new HashMap<String,String>();
-	ManagedList<BeanDefinition> viewResolvers = new ManagedList<BeanDefinition>();
-
-
-
-		String defaultContentType = "text/html";
-		viewResolvers.add(
-			BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.view.thymeleaf.ThymeleafViewResolver")
-			.addPropertyValue("providePrefix", "classpath:com/u2ware/springfield/view/thymeleaf/TwitterBootstrapBasedSample1")
-			.addPropertyValue("provideSuffix", ".html")
-			.getBeanDefinition()				
-		);
-
-		mediaTypes.put("html", "text/html");
-		viewResolvers.add(
-			BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.view.thymeleaf.ThymeleafViewResolver")
-			.addPropertyValue("viewNames", "*.html")
-			.addPropertyValue("providePrefix", "classpath:com/u2ware/springfield/view/thymeleaf/JQueryMobileBasedSample1")
-			.addPropertyValue("provideSuffix", ".html")
-			.getBeanDefinition()				
-		);
-
-		mediaTypes.put("thymeleaf", "text/html");
-		viewResolvers.add(
-			BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.view.thymeleaf.ThymeleafViewResolver")
-			.addPropertyValue("viewNames", "*.thymeleaf")
-			.getBeanDefinition()
-		);
-
-		mediaTypes.put("json", "application/json");
-		viewResolvers.add(
-			BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.view.jackson.JsonViewResolver")
-			.addPropertyValue("viewNames", "*.json")
-			.getBeanDefinition()				
-		);
-
-		mediaTypes.put("xjson", "application/json");
-		viewResolvers.add(
-			BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.view.xstream.JsonViewResolver")
-			.addPropertyValue("viewNames", "*.xjson")
-			.getBeanDefinition()				
-		);
-
-		mediaTypes.put("xml", "application/xml");
-		viewResolvers.add(
-			BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.view.xstream.XmlViewResolver")
-			.addPropertyValue("viewNames", "*.xml")
-			.getBeanDefinition()
-		);
-	
-		mediaTypes.put("xls", "application/vnd.ms-excel");
-		viewResolvers.add(
-			BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.view.jexcel.ExcelViewResolver")
-			.addPropertyValue("viewNames", "*.xls")
-			.getBeanDefinition()
-		);
-
-	Resource location = new ClassPathResource(ClassUtils.convertClassNameToResourcePath(modulesConfig.getBasePackage())+"/tiles-definitions.xml");
-	logger.debug(location);
-	logger.debug(location.exists());
-	//logger.debug(location.exists());
-	
-	if(location.exists()){
-		mediaTypes.put("tiles", "text/html");
+	///////////////////////////////////////
+	//
+	///////////////////////////////////////
+	private void addMultipartResolverConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
 		
-		viewResolvers.add(
-			BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.view.tiles.TilesViewResolver")
-			.addPropertyValue("viewNames", "*.tiles")
-			.addPropertyValue("definition", location)
-			.getBeanDefinition()
-		);
+		String beanName = "filterMultipartResolver";
+		if(registry.isBeanNameInUse(beanName)) {registry.removeBeanDefinition(beanName);}
+
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("org.springframework.web.multipart.commons.CommonsMultipartResolver")
+				.addPropertyValue("maxUploadSize", getSpringfieldConfigurerValue(Configurer.MULTIPART_SIZE) )
+				.getRawBeanDefinition();
+				
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+	
+	private void addMultipartHandlerConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
+		
+		String beanName = "springfieldMultipartFileHandler";
+		if(registry.isBeanNameInUse(beanName)) {registry.removeBeanDefinition(beanName);}
+
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.support.multipart.MultipartFileHandlerImpl")
+				.addPropertyValue("directory", getSpringfieldConfigurerValue(Configurer.MULTIPART_LOCATION))
+				.getRawBeanDefinition();
+				
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+
+	private void addSpringfieldContextWebmvcBaseConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
+
+		String beanName = "springfieldContextWebmvcBase";
+		if(registry.isBeanNameInUse(beanName)) {registry.removeBeanDefinition(beanName);}
+
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.config.support.ContextWebmvcBase")
+				.addPropertyReference("configurer", Configurer.BEAN_NAME)
+				.getRawBeanDefinition();
+				
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+	private void addSpringfieldContextWebmvcSecurityConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
+
+		String beanName = "springfieldContextWebmvcSecurity";
+		if(registry.isBeanNameInUse(beanName)) {registry.removeBeanDefinition(beanName);}
+
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.config.support.ContextWebmvcSecurity")
+				.addPropertyReference("configurer", Configurer.BEAN_NAME)
+				.getRawBeanDefinition();
+				
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
+	}
+
+	
+	private void addSpringfieldContextRepositoryBaseConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig, String annotationDrivenTransactionManagerRef) {
+		String beanName = "springfieldContextRepositoryBase";
+		if(registry.isBeanNameInUse(beanName)) {registry.removeBeanDefinition(beanName);}
+
+		BeanDefinition beanDefinition = BeanDefinitionBuilder
+				.rootBeanDefinition("com.u2ware.springfield.config.support.ContextRepositoryBase")
+				.addPropertyReference("annotationDrivenTransactionManager", annotationDrivenTransactionManagerRef)
+				.getRawBeanDefinition();
+				
+		this.registerBeanDefinition(registry, beanName, beanDefinition);
 	}
 	
 	
-		
-	BeanDefinition beanDefinition = BeanDefinitionBuilder
-			.rootBeanDefinition("org.springframework.web.servlet.view.ContentNegotiatingViewResolver")
-			.addPropertyValue("defaultContentType", defaultContentType)
-			.addPropertyValue("mediaTypes", mediaTypes)
-			.addPropertyValue("viewResolvers", viewResolvers)
-			.getBeanDefinition();
-
-	
-	
-	this.registerBeanDefinition(registry, beanName, beanDefinition);
-	
 }
-
-///////////////////////////////////////
-//
-///////////////////////////////////////
-private void addMessageSourceConfiguration(BeanDefinitionRegistry registry,ModulesConfig modulesConfig) {
-	if(StringUtils.hasText(modulesConfig.getMessageSourceRef())) return;
-
-	String beanName = "messageSource";
-	if(registry.isBeanNameInUse(beanName)) return;
 	
-	BeanDefinition beanDefinition = BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.support.message.ExtendedReloadableResourceBundleMessageSource")
-			.addPropertyValue("basenamePackages", modulesConfig.getBasePackage())
-			.addPropertyValue("defaultEncoding", "UTF-8")
-			.getBeanDefinition();
-	
-	this.registerBeanDefinition(registry, beanName, beanDefinition);
-}
-
-private void addConversionServiceConfiguration(BeanDefinitionRegistry registry, ModulesConfig modulesConfig) {
-	if(StringUtils.hasText(modulesConfig.getConversionServiceRef())) return;
-
-	String beanName = "conversionService";
-	if(registry.isBeanNameInUse(beanName)) return;
-	
-	//Set formatter = new HashSet();
-	//formatter.add(new StringTrimFormatter());
-	
-	BeanDefinition beanDefinition = BeanDefinitionBuilder
-			.rootBeanDefinition("org.springframework.format.support.FormattingConversionServiceFactoryBean")
-			//.addPropertyReference("formatter", "com.u2ware.springfield.support.conversion.StringTrimFormatter")
-			.getBeanDefinition();
-	
-	this.registerBeanDefinition(registry, beanName, beanDefinition);
-}
-
-
-private void addValidatorConfiguration(BeanDefinitionRegistry registry,ModulesConfig modulesConfig) {
-	if(StringUtils.hasText(modulesConfig.getValidatorRef())) return;
-	
-	String beanName = "validator";
-	if(registry.isBeanNameInUse(beanName)) return;
-	
-	BeanDefinition messageInterpolator = BeanDefinitionBuilder
-			.rootBeanDefinition("com.u2ware.springfield.support.validation.ValidationMessageInterpolator")
-			.getBeanDefinition();
-	
-	BeanDefinition beanDefinition = BeanDefinitionBuilder
-			.rootBeanDefinition("org.springframework.validation.beanvalidation.LocalValidatorFactoryBean")
-			.addPropertyValue("messageInterpolator", messageInterpolator)
-			.getBeanDefinition();
-	
-	this.registerBeanDefinition(registry, beanName, beanDefinition);
-}
-
-*/
-
 
 
 

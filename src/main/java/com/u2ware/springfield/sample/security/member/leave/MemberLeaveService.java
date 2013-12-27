@@ -32,7 +32,7 @@ public class MemberLeaveService extends EntityServiceImpl<MemberLeave, MemberLea
 	public MemberLeave create(MemberLeave entity) {
 
 		String username = authenticationContext.getUsername();
-		Users user = usersRepository.read(username);
+		Users user = usersRepository.findOne(username);
 		user.setEnabled(false);
 		
 		authenticationContext.logoff();

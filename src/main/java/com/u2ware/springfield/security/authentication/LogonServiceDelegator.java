@@ -29,7 +29,6 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationFa
 
 public class LogonServiceDelegator implements UserDetailsService, AuthenticationSuccessHandler, AuthenticationFailureHandler,  ApplicationContextAware, InitializingBean{
 
-	//private static final Logger logger = LoggerFactory.getLogger(LogonServiceDelegator.class);
 
 	private ApplicationContext applicationContext;
 	private String defaultTargetUrl;

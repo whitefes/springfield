@@ -43,7 +43,7 @@ public class LoginUserDetailsRepository implements LogonService{
 	@Transactional
 	public UserDetails loadUserByUsername(String username) throws DataAccessException{
 		logger.debug("loadUserByUsername : "+username);
-		Users user = usersRepository.read(username);
+		Users user = usersRepository.findOne(username);
 		if (user == null) {
 			throw new DataRetrievalFailureException("Query returned no results for user '" + username + "'");
 		}

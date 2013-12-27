@@ -32,7 +32,7 @@ public class MemberPasswordService extends EntityServiceImpl<MemberPassword, Mem
 	public MemberPassword create(MemberPassword entity) {
 		
 		String username = authenticationContext.getUsername();
-		Users user = usersRepository.read(username);
+		Users user = usersRepository.findOne(username);
 		
 		String password = authenticationContext.getPassword(entity.getNewPassword1(), user.getSalt());
 		user.setPassword(password);

@@ -35,7 +35,7 @@ public class MemberInfoService extends EntityServiceImpl<MemberInfo, MemberInfo>
 	public MemberInfo create(MemberInfo entity) {
 
 		String username = authenticationContext.getUsername();
-		Users user = usersRepository.read(username);
+		Users user = usersRepository.findOne(username);
 		user.setDescription(entity.getDescription());
 		return entity;
 	}	

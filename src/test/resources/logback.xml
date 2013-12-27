@@ -7,15 +7,16 @@
 	</appender>
 
 
-	
-	<logger name="org.hibernate" level="OFF" />
-	<logger name="org.mybatis" level="OFF" />
 	<logger name="org.thymeleaf" level="OFF" />
-	<logger name="org.springframework" level="OFF" />
+	<logger name="org.hibernate.SQL" level="DEBUG" />
+	<logger name="org.mybatis" level="OFF" />
+	<logger name="org.springframework" level="OFF" /> 
+	<logger name="org.springframework.transaction" level="DEBUG" />
+	<logger name="org.springframework.orm" level="DEBUG" />
 	<logger name="org.springframework.data" level="OFF" />
 	<logger name="org.springframework.security" level="OFF" />
 	
-	<logger name="com.u2ware.springfield" level="DEBUG" />
+	<logger name="com.u2ware.springfield" level="WARN" />
 
 	<root level="OFF">
 		<appender-ref ref="STDOUT" />

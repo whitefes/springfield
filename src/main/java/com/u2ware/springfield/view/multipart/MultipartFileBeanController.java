@@ -9,9 +9,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.View;
 
@@ -22,8 +19,7 @@ import com.u2ware.springfield.view.jackson.JsonView;
 
 public abstract class MultipartFileBeanController {
 	
-	private static final Logger logger = LoggerFactory.getLogger(MultipartFileBeanController.class);
-
+	protected final Logger logger = LoggerFactory.getLogger(getClass());
 
 	public abstract MultipartFileHandler getMultipartFileHandler() ;
 	public abstract UploadFileNameResolver getMultipartFileNameResolver(String name) ;
@@ -34,13 +30,10 @@ public abstract class MultipartFileBeanController {
 		//write bean to json
 	}
 
-	@RequestMapping(value="/upload", method=RequestMethod.POST)
-	public View upload(HttpServletRequest request, HttpServletResponse response, 
-			@RequestParam("multipartFile")MultipartFile[] multipartFile, 
-			@RequestParam(value="contentFile",required=false)String name, 
-			Model model) throws Exception{
+	
+	protected View uploadHandle(MultipartFile[] multipartFile, String name, Model model) throws Exception{
 		
-		logger.debug("upload");
+		logger.warn("uploadHandle");
 		
 		List<MultipartFileBean> result = new ArrayList<MultipartFileBean>();
 		
@@ -50,7 +43,7 @@ public abstract class MultipartFileBeanController {
 			String contentType = f.getContentType();
 			long contentSize = f.getSize();
 
-			MultipartFileBean bean = new MultipartFileBeanBase(contentFile, contentName, contentType, contentSize, false);
+			MultipartFileBean bean = new MultipartFileBeanBase(contentFile, contentName, contentType, contentSize);
 			result.add(bean);
 		}
 		model.addAttribute(EntityController.MODEL_ENTITY, result.size() != 1 ? result : result.get(0));
@@ -58,10 +51,9 @@ public abstract class MultipartFileBeanController {
 		return jsonView;
 	}
 	
-	@RequestMapping(value="/delete", method=RequestMethod.POST)
-	public View delete(HttpServletRequest request, HttpServletResponse response, @RequestParam("multipartFile")String[] multipartFile, Model model) throws Exception{
+	protected View deleteHandle(String[] multipartFile, Model model) throws Exception{
 		
-		logger.debug("delete");
+		logger.warn("deleteHandle");
 
 		List<MultipartFileBean> result = new ArrayList<MultipartFileBean>();
 	
@@ -74,7 +66,7 @@ public abstract class MultipartFileBeanController {
 			String contentType = null;
 			long contentSize = 0;
 
-			result.add(new MultipartFileBeanBase(contentFile, contentName, contentType, contentSize, false));
+			result.add(new MultipartFileBeanBase(contentFile, contentName, contentType, contentSize));
 		}
 		model.addAttribute(EntityController.MODEL_ENTITY, result.size() != 1 ? result : result.get(0));
 

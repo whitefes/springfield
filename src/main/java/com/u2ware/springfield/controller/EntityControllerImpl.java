@@ -1,5 +1,6 @@
 package com.u2ware.springfield.controller;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.ui.Model;
 import org.springframework.util.ClassUtils;
@@ -7,13 +8,14 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.client.HttpClientErrorException;
 
 import com.u2ware.springfield.domain.EntityInformation;
-import com.u2ware.springfield.domain.EntityPageImpl;
 import com.u2ware.springfield.domain.EntityPageable;
-import com.u2ware.springfield.domain.EntityPageableContainer;
-import com.u2ware.springfield.domain.ResultContainable;
+import com.u2ware.springfield.domain.EntitySortable;
+import com.u2ware.springfield.domain.Pagination;
+import com.u2ware.springfield.domain.PaginationRequest;
 import com.u2ware.springfield.service.EntityService;
 import com.u2ware.springfield.validation.EntityValidator;
 import com.u2ware.springfield.validation.RejectableException;
@@ -42,11 +44,14 @@ public class EntityControllerImpl<T,Q> extends EntityController<T,Q>{
 		super.setValidator(validator);
 	}
 	
-	
+
 	
 	@RequestMapping(method={RequestMethod.GET, RequestMethod.POST}, value="/")
-	public String home(Model model,  @ModelAttribute(MODEL_QUERY)Q query,BindingResult errors) throws Exception{
+	public String home(Model model, @ModelAttribute(MODEL_QUERY)Q query,BindingResult errors) throws Exception{
 
+		logger.warn("request method: home()");
+		logger.warn("request model : "+query);	
+		
 		getValidator().home(query, errors);
 		if(errors.hasErrors()){
 			return resolveViewName(model, errors, "home", null, query, null, null);
@@ -64,36 +69,54 @@ public class EntityControllerImpl<T,Q> extends EntityController<T,Q>{
 	
 	
 	@RequestMapping(method={RequestMethod.GET, RequestMethod.POST}, value="")
-	public String find(EntityPageable pageableArgument, Model model, @ModelAttribute(MODEL_QUERY) Q query,BindingResult errors) throws Exception{
+	public String find(
+			@RequestParam(required=false,value=ENABLE_PARAMETER_NAME,defaultValue="true")Boolean pageEnable,
+			Model model, Pageable pageable, @ModelAttribute(MODEL_QUERY)Q query, BindingResult errors) throws Exception{
 
-		
-		EntityPageable pageable = pageableArgument;
-		if(ClassUtils.isAssignableValue(EntityPageableContainer.class, query)){
-			pageable = ((EntityPageableContainer) query).getEntityPageable();
-		}else if(ClassUtils.isAssignableValue(EntityPageable.class, query)){
-			pageable = ((EntityPageable) query);
+		logger.warn("request method: find()");
+		logger.warn("request model : "+query);	
+
+		boolean isNew = false;
+		int page = 0;
+		int size = 20;
+		boolean enable = true;
+		String[] sortSource = null;
+		if(ClassUtils.isAssignableValue(EntitySortable.class, query)){
+			EntitySortable t = (EntitySortable)query;
+			sortSource = t.getSortSource();
+			isNew = true;
+		}
+		if(ClassUtils.isAssignableValue(EntityPageable.class, query)){
+			EntityPageable t = (EntityPageable)query;
+			page = t.getPageNumber();
+			size = t.getPageSize();
+			enable = t.isPageEnable();
+			isNew = true;
+		}
+		Pageable p = null;
+		if(isNew && enable){
+			p = new PaginationRequest(page, size, sortSource);
+			logger.warn("request model : new pageable="+p);	
+		}else if(pageEnable){
+			p = pageable;
+			logger.warn("request model : pageable="+p);	
 		}
 		
-		logger.info("pageable : "+pageable);
-
+		
 		getValidator().findForm(query, errors);
 		if(errors.hasErrors()){
-			return resolveViewName(model, errors, "find", null, query, pageable, new EntityPageImpl<T>());
+			return resolveViewName(model, errors, "find", null, query, p, new Pagination<T>());
 		}
 		
 		try{
-			Iterable<?> result = getService().find(query, pageable);
-
-			if(ClassUtils.isAssignable(ResultContainable.class, query.getClass())){
-				ResultContainable target = (ResultContainable)query;
-				target.setResult(result);
-				logger.info("result copied in query object : ");
-			}
+			Iterable<?> result = getService().find(query, p);
+			if(result == null)
+				result = new Pagination<T>();
 			
-			return resolveViewName(model, errors, "find", null, query, pageable, result);
+			return resolveViewName(model, errors, "find", null, query, p, result);
 		}catch(RejectableException e){
 			super.validate(errors, e);
-			return resolveViewName(model, errors, "find", null, query, pageable, new EntityPageImpl<T>());
+			return resolveViewName(model, errors, "find", null, query, p, new Pagination<T>());
 		}
 	}
 	
@@ -101,6 +124,9 @@ public class EntityControllerImpl<T,Q> extends EntityController<T,Q>{
 	@RequestMapping(method=RequestMethod.GET, value="/"+COMMAND_ID_PATH+"")
 	public String read(Model model, @ModelAttribute(MODEL_ENTITY)T entity,BindingResult errors) throws Exception{
 		
+		logger.warn("request method: read()");
+		logger.warn("request model : "+entity);	
+
 		getValidator().read(entity, errors);
 		if(errors.hasErrors()){
 			return resolveViewName(model, errors, "read", entity, null, null, null);
@@ -108,7 +134,6 @@ public class EntityControllerImpl<T,Q> extends EntityController<T,Q>{
 
 		try{
 			T newEntity = getService().read(entity);
-			logger.debug("newEntity : "+newEntity);
 			if(newEntity == null) 
 				throw new HttpClientErrorException(HttpStatus.NOT_FOUND);		
 
@@ -123,6 +148,9 @@ public class EntityControllerImpl<T,Q> extends EntityController<T,Q>{
 	
 	@RequestMapping(method=RequestMethod.GET, value="/new")
 	public String createForm(Model model, @ModelAttribute(MODEL_ENTITY)T entity, BindingResult errors) throws Exception{
+
+		logger.warn("request method: createForm()");
+		logger.warn("request model : "+entity);	
 
 		getValidator().createForm(entity, errors);
 		if(errors.hasErrors()){
@@ -143,6 +171,9 @@ public class EntityControllerImpl<T,Q> extends EntityController<T,Q>{
 	@RequestMapping(method=RequestMethod.POST, value="/new")
 	public String create(Model model, @ModelAttribute(MODEL_ENTITY) T entity, BindingResult errors) throws Exception{
 		
+		logger.warn("request method: create()");
+		logger.warn("request model : "+entity);	
+
 		getValidator().create(entity, errors);
 		if(errors.hasErrors()){
 			return resolveViewName(model, errors, "createForm", entity, null, null, null);
@@ -162,6 +193,9 @@ public class EntityControllerImpl<T,Q> extends EntityController<T,Q>{
 	@RequestMapping(method=RequestMethod.GET, value="/"+COMMAND_ID_PATH+"/edit")
 	public String updateForm(Model model, @ModelAttribute(MODEL_ENTITY)T entity, BindingResult errors) throws Exception{
 		
+		logger.warn("request method: updateForm()");
+		logger.warn("request model : "+entity);	
+
 		getValidator().updateForm(entity, errors);
 		if(errors.hasErrors()){
 			return resolveViewName(model, errors, "updateForm", entity, null, null, null);
@@ -180,6 +214,9 @@ public class EntityControllerImpl<T,Q> extends EntityController<T,Q>{
 	
 	@RequestMapping(method=RequestMethod.PUT, value="/"+COMMAND_ID_PATH+"/edit")
 	public String update(Model model, @ModelAttribute(MODEL_ENTITY) T entity,BindingResult errors) throws Exception{
+
+		logger.warn("request method: update()");
+		logger.warn("request model : "+entity);	
 
 		getValidator().update(entity, errors);
 		if(errors.hasErrors()){
@@ -200,6 +237,9 @@ public class EntityControllerImpl<T,Q> extends EntityController<T,Q>{
 	@RequestMapping(method=RequestMethod.DELETE, value="/"+COMMAND_ID_PATH+"/edit")
 	public String delete(Model model, @ModelAttribute(MODEL_ENTITY)T entity, BindingResult errors) throws Exception{
 		
+		logger.warn("request method: delete()");
+		logger.warn("request model : "+entity);	
+
 		getValidator().delete(entity, errors);
 		if(errors.hasErrors()){
 			return resolveViewName(model, errors, "read", entity, null, null, null);

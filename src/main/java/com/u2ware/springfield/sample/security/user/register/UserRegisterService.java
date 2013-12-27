@@ -14,7 +14,7 @@ import com.u2ware.springfield.security.authentication.Role;
 import com.u2ware.springfield.service.EntityServiceImpl;
 
 
-@Service
+@Service("userRegisterService")
 public class UserRegisterService extends EntityServiceImpl<UserRegister, UserRegister>{
 
 	@Autowired
@@ -30,6 +30,7 @@ public class UserRegisterService extends EntityServiceImpl<UserRegister, UserReg
 	@Transactional
 	public UserRegister create(UserRegister entity) {
 		
+		
 		String username = entity.getUsername();
 		String salt = authenticationContext.getPasswordSalt();
 		String password = authenticationContext.getPassword(entity.getPassword1(), salt);
@@ -42,13 +43,16 @@ public class UserRegisterService extends EntityServiceImpl<UserRegister, UserReg
 		user.setPassword(password);
 		user.setDescription(description);
 		user.setRole(role.toString());
-		usersRepository.create(user);
+		usersRepository.save(user);
 		
 
 		for(GrantedAuthority authority : role.getAuthorities()){
-			authoritiesRepository.create(new Authorities(username, authority.getAuthority()));
+			authoritiesRepository.save(new Authorities(username, authority.getAuthority()));
 		}
-		logger.debug(user.toString());
+		logger.warn(user.toString());
+		logger.warn(user.toString());
+		logger.warn(user.toString());
+		logger.warn(user.toString());
 		
 		authenticationContext.logoff();
 		

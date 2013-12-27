@@ -24,7 +24,7 @@ public class UserForgotService extends EntityServiceImpl<UserForgot, UserForgot>
 	public UserForgot create(UserForgot entity) {
 		
 		String username = entity.getUsername();
-		Users user = usersRepository.read(username);
+		Users user = usersRepository.findOne(username);
 		// send mail......
 
 		entity.setUsername(user.getUsername());

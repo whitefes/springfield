@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.u2ware.springfield.sample.part3.step3.MybatisBean">
+
+	<resultMap type="com.u2ware.springfield.sample.part3.step3.MybatisBean" id="entityType"/>
+
+	<select id="exists" parameterType="map" resultType="integer">
+		select count(id) from MybatisBean 
+		<if test="id != null">where id = #{id}</if>
+		<if test="id == null">where id = #{entity.id}</if>
+	</select>
+
+	<select id="findOne" parameterType="map" resultMap="entityType">
+		select * from MybatisBean 
+		<if test="id != null">where id = #{id}</if>
+		<if test="id == null">where id = #{entity.id}</if>
+	</select>
+
+	<update id="update" parameterType="map">
+		update MybatisBean set 
+		password = #{entity.password} , name = #{entity.name}, age = #{entity.age}
+		where id = #{entity.id}
+	</update>
+
+	<insert id="insert" parameterType="map">
+		 insert into MybatisBean ( id, password, name, age ) 
+		 values ( #{entity.id}, #{entity.password}, #{entity.name}, #{entity.age} )
+	</insert>
+
+
+	<delete id="delete" parameterType="map">
+		delete from MybatisBean
+		<if test="id != null">where id = #{id}</if>
+		<if test="id == null">where id = #{entity.id}</if>
+	</delete>
+
+
+	<select id="findAll" parameterType="map" resultMap="entityType">
+		select * from MybatisBean
+		<include refid="whereSyntax"/>
+		<!-- <include refid="orderSyntax"/> -->
+	</select>
+
+	<select id="countAll" parameterType="map" resultType="long">
+		select count(*) from MybatisBean 
+		<include refid="whereSyntax"/>
+	</select>
+
+	<delete id="deleteAll" parameterType="map">
+		delete from MybatisBean
+		<include refid="whereSyntax"/>
+	</delete>
+	
+	
+	<sql id="whereSyntax">
+		<if test="query != null">
+			<trim prefix="WHERE" prefixOverrides="AND |OR ">
+				<if test="query.id != null"> and id = #{query.id}</if> 
+				<if test="query.password != null">and password = #{query.password}</if>
+				<if test="query.name != null"> and name = #{query.name}</if> 
+				<if test="query.age != null"> and age = #{query.age}</if> 
+			</trim>
+		</if>
+	</sql>
+	
+	
+	<sql id="orderSyntax">
+		<if test="pageable != null">
+			<trim prefix="order by" prefixOverrides=", ">
+				<foreach item="item" index="index" collection="pageable.sortOrders">
+					<if test="item.direction == 1">
+						, ${item.property} asc
+					</if>
+					<if test="item.direction == -1">
+						, ${item.property} desc
+					</if>
+				</foreach>
+			</trim>
+		</if>
+	</sql>
+
+
+
+
+	<!-- 
+	#######################################
+	#
+	#######################################
+	 -->
+	<select id="findByIdAndPasswordOrderByNameDesc" parameterType="map" resultMap="entityType">
+		select * from MybatisBean
+
+		<include refid="whereSyntaxIdAndPasswordOrderByNameDesc"/>
+	<!-- 	<include refid="orderSyntax"/> -->
+	</select>
+	
+	<select id="countByIdAndPasswordOrderByNameDesc" parameterType="map" resultType="long">
+		select count(*) from MybatisBean 
+		<include refid="whereSyntaxIdAndPasswordOrderByNameDesc"/>
+	</select>
+	
+	<delete id="deleteByIdAndPasswordOrderByNameDesc" parameterType="map">
+		delete from MybatisBean
+		<include refid="whereSyntaxIdAndPasswordOrderByNameDesc"/>
+	</delete>
+	
+	<sql id="whereSyntaxIdAndPasswordOrderByNameDesc">
+		<trim prefix="WHERE" prefixOverrides="AND |OR ">
+			<if test="query.id != null"> and id = #{query.id}</if> 
+			<if test="query.password != null">and password = #{query.password}</if>
+		</trim>
+	</sql>
+
+
+	<!-- 
+	#######################################
+	#
+	#######################################
+	 -->
+	<select id="findByNameAndAgeOrderByIdAsc" parameterType="map" resultMap="entityType">
+		select * from MybatisBean
+
+		<include refid="whereSyntaxNameAndAgeOrderByIdAsc"/>
+		<!-- <include refid="orderSyntax"/> -->
+	</select>
+
+	<select id="countByNameAndAgeOrderByIdAsc" parameterType="map" resultType="long">
+		select count(*) from MybatisBean 
+		<include refid="whereSyntaxNameAndAgeOrderByIdAsc"/>
+	</select>
+
+	<delete id="deleteByNameAndAgeOrderByIdAsc" parameterType="map">
+		delete from MybatisBean
+		<include refid="whereSyntaxNameAndAgeOrderByIdAsc"/>
+	</delete>
+
+	<sql id="whereSyntaxNameAndAgeOrderByIdAsc">
+		<trim prefix="WHERE" prefixOverrides="AND |OR ">
+			<if test="query.name != null"> and name = #{query.name}</if> 
+			<if test="query.age != null"> and age = #{query.age}</if> 
+		</trim>
+	</sql>
+
+
+</mapper>

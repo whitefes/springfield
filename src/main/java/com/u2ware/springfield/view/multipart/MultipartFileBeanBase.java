@@ -7,15 +7,13 @@ public class MultipartFileBeanBase implements MultipartFileBean{
 	private String contentName;
 	private String contentType;
 	private Long contentSize;
-	private boolean isDownload;
 	
-	public MultipartFileBeanBase(String contentFile, String contentName,String contentType, long contentSize, boolean isDownload) {
+	public MultipartFileBeanBase(String contentFile, String contentName,String contentType, long contentSize) {
 		super();
 		this.contentFile = contentFile;
 		this.contentType = contentType;
 		this.contentName = contentName;
 		this.contentSize = contentSize;
-		this.isDownload = isDownload;
 	}
 
 	public String getContentFile() {
@@ -42,9 +40,4 @@ public class MultipartFileBeanBase implements MultipartFileBean{
 	public void setContentSize(Long contentSize) {
 		this.contentSize = contentSize;
 	}
-
-	@Override
-	public boolean isDownload() {
-		return isDownload;
-	}	
 }

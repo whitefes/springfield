@@ -1,0 +1,59 @@
+<navigation path="/" name="Springfield">
+	<navigation pattern="/part1/**"  path="/part1/step1/"  name="part1" >
+		<navigation name="step1" >
+			<navigation pattern="/part1/step1/**"  path="/part1/step1/"  name="SimpleEntity" />
+		</navigation>
+		<navigation name="step2" >
+			<navigation pattern="/part1/step2/**"  path="/part1/step2/"  name="QueryEntity" />
+		</navigation>
+		<navigation name="step3" >
+			<navigation pattern="/part1/step3/**"  path="/part1/step3/"  name="FindEntity" />
+		</navigation>
+		<navigation name="step4" >
+			<navigation pattern="/part1/step4/**"  path="/part1/step41/"  name="FindByName" />
+			<navigation                            path="/part1/step42/"  name="FindByAgeBetween" />
+		</navigation>
+	</navigation>
+
+	<navigation pattern="/part2/**"  path="/part2/step1.html"  name="part2" >
+		<navigation  name="step1" >
+			<navigation pattern="/part2/step1/**"  path="/part2/step1.html"  name="/part2/step1.html" />
+			<navigation                            path="/part2/step1.json"  name="/part2/step1.json" />
+			<navigation                            path="/part2/step1.xml"  name="/part2/step1.xml" />
+			<navigation                            path="/part2/step1.xls"  name="/part2/step1.xls" />
+			<navigation                            path="/part2/step1.csv"  name="/part2/step1.csv" />
+		</navigation>
+		<navigation  name="step2" >
+			<navigation pattern="/part2/step2/**"  path="/part2/step2.do"  name="/part2/step2.do" />
+		</navigation>
+	</navigation>
+
+
+	<navigation pattern="/part5/**"  path="/part5/step3.html"  name="part5" >
+		<navigation  name="step3" >
+			<navigation pattern="/part5/step3/**"  path="/part5/step3.html"  name="AttachedFile" />
+		</navigation>
+		<navigation  name="step4" >
+			<navigation pattern="/part5/step4/**"  path="/part5/step4/upload.html"  name="AjaxUpload" />
+		</navigation>
+	</navigation>
+	
+	
+	<navigation pattern="/security/**" path="/security/user/loginForm.html" hide="true" accessible="true" access="hasRole('ROLE_ANONYMOUS')" name="security" >
+		<navigation name="user" >
+			<navigation pattern="/security/user/loginForm/**"  path="/security/user/loginForm.html"  name="LogIn" />
+			<navigation pattern="/security/user/forgot/**"     path="/security/user/forgot/new.html"  name="Forgot" />
+			<navigation pattern="/security/user/register/**"   path="/security/user/register/new.html"  name="register" />
+		</navigation>
+		<navigation name="member" >
+			<navigation pattern="/security/member/info/**"      access="hasRole('ROLE_USER')" path="/security/member/info/new.html"  name="info" />
+			<navigation pattern="/security/member/password/**"  access="hasRole('ROLE_USER')" path="/security/member/password/new.html"  name="password" />
+			<navigation pattern="/security/member/leave/**"     access="hasRole('ROLE_USER')" path="/security/member/leave/new.html"  name="leave" />
+		</navigation>
+		<navigation name="admin" >
+			<navigation pattern="/security/admin/authority/**" accessible="true" access="hasRole('ROLE_ADMIN')" path="/security/admin/authority.html"  name="authority" />
+			<navigation pattern="/security/admin/member/**"    accessible="true" access="hasRole('ROLE_ADMIN')" path="/security/admin/member.html"  name="member" />
+		</navigation>
+	</navigation>
+</navigation>
+<!-- "hasRole('ROLE_USER') and isFullyAuthenticated()" -->

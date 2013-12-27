@@ -13,15 +13,15 @@ public class EntityControllerInterceptor implements org.springframework.web.serv
 
 	
 	public boolean preHandle(HttpServletRequest request,HttpServletResponse response, Object handler) throws Exception {
-		logger.info("preHandle : "+request.getRequestURI()+" "+handler);
+		logger.warn("preHandle : "+request.getRequestURI());
 		return true;
 	}
 
 	public void postHandle(HttpServletRequest request,HttpServletResponse response, Object handler,ModelAndView modelAndView) throws Exception {
-		logger.info("postHandle : "+request.getRequestURI()+" "+handler);
+		logger.warn("postHandle : "+request.getRequestURI());
 	}
 
 	public void afterCompletion(HttpServletRequest request,HttpServletResponse response, Object handler, Exception ex)throws Exception {
-		logger.info("afterCompletion : "+request.getRequestURI()+" "+handler);
+		logger.warn("afterCompletion : "+request.getRequestURI());
 	}
 }

@@ -18,7 +18,7 @@ public class LoginController {
 	private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
 	
 	
-	@RequestMapping(value="/security/user/loginForm",method=RequestMethod.GET)
+	@RequestMapping(value="/security/user/loginForm.html",method=RequestMethod.GET)
 	public String loginForm(@RequestParam(value="errorCode",required=false)String errorCode, Model model){
 
 		Object principal = null;
